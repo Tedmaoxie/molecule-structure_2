@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VSEPR 3D 可视化教学系统by实验中学</title>
+    <style>
+        /* ==================== 全局样式 ==================== */
+        :root {
+            --primary-color: #00f3ff; /* 霓虹蓝 */
+            --secondary-color: #ff0055; /* 霓虹红 */
+            --bg-color: #050510; /* 深空黑 */
+            --panel-bg: rgba(10, 15, 30, 0.85); /* 半透明面板背景 */
+            --text-color: #e0e0ff;
+            --font-tech: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-tech);
+        }
+
+        /* ==================== 3D 容器 ==================== */
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* ==================== UI 覆盖层 ==================== */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* 让点击穿透到 3D 场景 */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* 通用面板样式 */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--primary-color);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 8px;
+            pointer-events: auto; /* 恢复面板交互 */
+            transition: all 0.3s ease;
+        }
+
+        .panel h2, .panel h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1px solid rgba(0, 243, 255, 0.3);
+            padding-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        /* ==================== 顶部 HUD ==================== */
+        .header-hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+
+        .title-box {
+            border-left: 4px solid var(--primary-color);
+            padding-left: 15px;
+        }
+
+        .title-box h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-shadow: 0 0 10px var(--primary-color);
+        }
+
+        .title-box p {
+            margin: 5px 0 0;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        /* ==================== 左侧控制面板 ==================== */
+        .control-panel {
+            position: absolute;
+            left: 20px;
+            top: 100px;
+            width: 300px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+
+        /* 自定义下拉框 */
+        select {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            border-radius: 4px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: none;
+            box-shadow: 0 0 10px var(--primary-color);
+        }
+
+        /* 自定义滑块 */
+        input[type=range] {
+            width: 100%;
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px var(--primary-color);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        .value-display {
+            float: right;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 10px 20px;
+            width: 100%;
+            cursor: pointer;
+            font-family: inherit;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background: var(--primary-color);
+            color: #000;
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        /* ==================== 右侧信息面板 ==================== */
+        .info-panel {
+            position: absolute;
+            right: 20px;
+            top: 100px;
+            width: 280px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            border-bottom: 1px dashed rgba(255,255,255,0.1);
+            padding-bottom: 5px;
+        }
+
+        .info-label { opacity: 0.7; }
+        .info-value { color: var(--secondary-color); font-weight: bold; }
+
+        /* ==================== 底部状态栏 ==================== */
+        .status-bar {
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #00ff00;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        /* ==================== 提示框 (Tooltip) ==================== */
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--primary-color);
+            padding: 10px;
+            border-radius: 4px;
+            pointer-events: none;
+            display: none;
+            z-index: 20;
+            max-width: 200px;
+        }
+        
+        /* 动画类 */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 243, 255, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 243, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 243, 255, 0); }
+        }
+        
+        .highlight {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D 渲染容器 -->
+    <div id="canvas-container"></div>
+
+    <!-- UI 界面 -->
+    <div id="ui-layer">
+        <!-- 顶部 -->
+        <div class="header-hud">
+            <div class="title-box">
+                <h1>VSEPR VISUALIZER by实验中学</h1>
+                <p>高中化学 · 价层电子对互斥理论可视化</p>
+            </div>
+            <div>
+                <span style="color: var(--primary-color); border: 1px solid var(--primary-color); padding: 5px 10px; border-radius: 4px;">v1.0.0</span>
+            </div>
+        </div>
+
+        <!-- 左侧控制 -->
+        <div class="control-panel panel">
+            <h3>控制中心</h3>
+            
+            <div class="control-group">
+                <label>选择预设分子或离子 (Presets)</label>
+                <select id="molecule-select">
+                    <option value="custom">-- 自定义 Custom --</option>
+                    
+                    <optgroup label="经典分子 (Classic)">
+                        <option value="CO2" selected>CO₂ (二氧化碳)</option>
+                        <option value="HCN">HCN (氰化氢)</option>
+                        <option value="H2O">H₂O (水)</option>
+                        <option value="NH3">NH₃ (氨气)</option>
+                        <option value="CH4">CH₄ (甲烷)</option>
+                        <option value="PCl5">PCl₅ (五氯化磷)</option>
+                        <option value="SF6">SF₆ (六氟化硫)</option>
+                    </optgroup>
+
+                    <optgroup label="扩展分子 (Extended)">
+                        <option value="HCHO">HCHO (甲醛)</option>
+                        <option value="SO2">SO₂ (二氧化硫)</option>
+                        <option value="O3">O₃ (臭氧)</option>
+                        <option value="SO3">SO₃ (三氧化硫)</option>
+                        <option value="BF3">BF₃ (三氟化硼)</option>
+                        <option value="BeCl2">BeCl₂ (氯化铍)</option>
+                        <option value="NF3">NF₃ (三氟化氮)</option>
+                        <option value="OF2">OF₂ (二氟化氧)</option>
+                    </optgroup>
+
+                    <optgroup label="离子 (Ions)">
+                        <option value="NH4+">NH₄⁺ (铵根离子)</option>
+                        <option value="CO3_2-">CO₃²⁻ (碳酸根离子)</option>
+                        <option value="SO4_2-">SO₄²⁻ (硫酸根离子)</option>
+                        <option value="SO3_2-">SO₃²⁻ (亚硫酸根离子)</option>
+                        <option value="ClO4-">ClO₄⁻ (高氯酸根离子)</option>
+                        <option value="NO2-">NO₂⁻ (亚硝酸根离子)</option>
+                        <option value="NO3-">NO₃⁻ (硝酸根离子)</option>
+                        <option value="H3O+">H₃O⁺ (水合氢离子)</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>成键电子对数 (BP/m) <span id="bp-val" class="value-display">2</span></label>
+                <input type="range" id="bp-slider" min="2" max="6" value="2" step="1">
+            </div>
+
+            <div class="control-group">
+                <label>孤电子对数 (LP/n) <span id="lp-val" class="value-display">0</span></label>
+                <input type="range" id="lp-slider" min="0" max="3" value="0" step="1">
+            </div>
+
+            <div class="control-group">
+                <label>孤对电子斥力强度 <span id="rep-val" class="value-display">1.0</span></label>
+                <input type="range" id="rep-slider" min="0.0" max="2.0" value="1.0" step="0.1">
+            </div>
+            
+            <div class="control-group" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="show-angles" checked style="width: auto;">
+                <label for="show-angles" style="margin: 0; cursor: pointer;">显示键角数值</label>
+            </div>
+
+            <button class="btn" id="reset-cam">重置视角 (Reset View)</button>
+            <button class="btn" id="toggle-auto-rotate">自动旋转 (Auto Rotate)</button>
+        </div>
+
+        <!-- 右侧信息 -->
+        <div class="info-panel panel">
+            <h3>构型分析 HUD</h3>
+            <div class="info-row">
+                <span class="info-label">通式 (Formula)</span>
+                <span class="info-value" id="info-formula">AX₂</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">价层电子对总数</span>
+                <span class="info-value" id="info-total">2</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">电子域几何构型</span>
+                <span class="info-value" id="info-electron-geo">直线形</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">分子空间构型</span>
+                <span class="info-value" id="info-molecular-geo">直线形</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">理想键角</span>
+                <span class="info-value" id="info-angle">180°</span>
+            </div>
+            <div style="margin-top: 15px; font-size: 0.85rem; color: #aaa; line-height: 1.4;" id="info-desc">
+                中心原子无孤对电子，成键电子对尽可能远离，形成直线形结构。
+            </div>
+        </div>
+
+        <!-- 底部 -->
+        <div class="status-bar">
+            <div class="status-item"><div class="status-dot"></div> 渲染引擎就绪</div>
+            <div class="status-item">FPS: <span id="fps-counter">60</span></div>
+            <div class="status-item">操作提示: 左键旋转 | 滚轮缩放 | 右键平移</div>
+        </div>
+    </div>
+
+    <!-- 鼠标悬停提示 -->
+    <div id="tooltip"></div>
+
+    <!-- 引用 UMD 版本的库文件 (非 module) -->
+    <script src="./js/three.js"></script>
+    <script src="./js/OrbitControls.js"></script>
+    <script src="./js/CSS2DRenderer.js"></script>
+    <!-- 引入 TWEEN.js 用于平滑动画 -->
+    <script src="./js/tween.js"></script>
+
+    <!-- 逻辑脚本 -->
+    <script>
+        // 全局变量挂载
+        const OrbitControls = THREE.OrbitControls;
+        const CSS2DRenderer = THREE.CSS2DRenderer;
+        const CSS2DObject = THREE.CSS2DObject;
+
+        // ==================== 1. 全局变量与常量 ====================
+        let scene, camera, renderer, labelRenderer, controls;
+        let moleculeGroup; // 存放整个分子模型
+        let labelsGroup;   // 存放键角标签
+        let particleSystem; // 背景粒子
+        let raycaster, mouse;
+        
+        // 动画控制
+        let currentAtomMeshes = []; // 追踪当前的原子Mesh以进行动画复用
+        let currentBondMeshes = [];
+        let currentLPMeshes = [];
+        
+        // CPK 配色方案 (RGB hex)
+        const COLORS = {
+            H: 0xFFFFFF, // 氢-白
+            C: 0x909090, // 碳-灰
+            N: 0x3050F8, // 氮-蓝
+            O: 0xFF0D0D, // 氧-红
+            F: 0x90E050, // 氟-浅绿
+            Cl: 0x1FF01F, // 氯-绿
+            S: 0xFFFF30, // 硫-黄
+            P: 0xFF8000, // 磷-橙
+            B: 0xFFB5B5, // 硼-粉
+            Be: 0xC2FF00, // 铍-黄绿
+            LonePair: 0xAA00FF, // 孤对电子-紫
+            Bond: 0xCCCCCC, // 化学键-银灰
+            Center: 0xDDDDDD // 通用中心原子
+        };
+
+        // 预设分子数据
+        const PRESETS = {
+            // === 经典分子 ===
+            'CO2': { 
+                m: 2, n: 0, center: 'C', outer: 'O', name: '二氧化碳',
+                realAngleInfo: { val: "180°", source: "Ideal/Experimental" },
+                bondInfo: { text: "1.16 Å", source: "NIST", values: [1.16, 1.16] },
+                dihedralInfo: "N/A (Linear)"
+            },
+            'HCN': { 
+                m: 2, n: 0, center: 'C', outer: ['H', 'N'], name: '氰化氢',
+                realAngleInfo: { val: "180°", source: "Experimental" },
+                bondInfo: { text: "C-H: 1.06 Å, C≡N: 1.16 Å", source: "NIST", values: [1.06, 1.16] }, // Order: H (idx0), N (idx1) ? Need to check calculateVectors order for linear.
+                dihedralInfo: "N/A (Linear)"
+            },
+            'H2O': { 
+                m: 2, n: 2, center: 'O', outer: 'H', name: '水', 
+                repulsion: 1.0, 
+                realAngleInfo: { val: "104.5°", source: "Experimental (Microwave Spectroscopy)" },
+                bondInfo: { text: "0.96 Å", source: "NIST", values: [0.96, 0.96] },
+                dihedralInfo: "N/A (3 Atoms)"
+            },
+            'NH3': { 
+                m: 3, n: 1, center: 'N', outer: 'H', name: '氨气', 
+                repulsion: 1.42, 
+                realAngleInfo: { val: "107.3°", source: "Experimental" },
+                bondInfo: { text: "1.01 Å", source: "NIST", values: [1.01, 1.01, 1.01] },
+                dihedralInfo: "N/A (Symmetric)"
+            },
+            'CH4': { 
+                m: 4, n: 0, center: 'C', outer: 'H', name: '甲烷', 
+                realAngleInfo: { val: "109.5°", source: "Experimental" },
+                bondInfo: { text: "1.09 Å", source: "NIST", values: [1.09, 1.09, 1.09, 1.09] },
+                dihedralInfo: "N/A (Symmetric)"
+            },
+            'PCl5': { 
+                m: 5, n: 0, center: 'P', outer: 'Cl', name: '五氯化磷',
+                realAngleInfo: { val: "90°, 120°", source: "Experimental" },
+                // PCl5: 3 Eq (2.02), 2 Ax (2.14). In calculateVectors, first 3 are Eq, last 2 are Ax.
+                bondInfo: { text: "Eq: 2.02 Å, Ax: 2.14 Å", source: "NIST/XRD", values: [2.02, 2.02, 2.02, 2.14, 2.14] },
+                dihedralInfo: "90° (Ax-Eq), 120° (Eq-Eq)"
+            },
+            'SF6': { 
+                m: 6, n: 0, center: 'S', outer: 'F', name: '六氟化硫',
+                realAngleInfo: { val: "90°", source: "Experimental" },
+                bondInfo: { text: "1.56 Å", source: "NIST", values: [1.56, 1.56, 1.56, 1.56, 1.56, 1.56] },
+                dihedralInfo: "90°"
+            },
+            
+            // === 新增分子 ===
+            'HCHO': { 
+                m: 3, n: 0, center: 'C', outer: ['O', 'H', 'H'], name: '甲醛', 
+                isHCHO: true,
+                realAngleInfo: { val: "H-C-H: 116.5°, H-C-O: 121.8°", source: "Experimental (Microwave Spectroscopy)" },
+                // HCHO: O (idx0), H (idx1), H (idx2)
+                bondInfo: { text: "C=O: 1.21 Å, C-H: 1.11 Å", source: "NIST", values: [1.21, 1.11, 1.11] },
+                dihedralInfo: "0° (Planar)"
+            },
+            'SO2': { 
+                m: 2, n: 1, center: 'S', outer: 'O', name: '二氧化硫',
+                repulsion: 1.2, 
+                realAngleInfo: { val: "119.0°", source: "Experimental (Microwave Spectroscopy)" },
+                bondInfo: { text: "1.43 Å", source: "NIST", values: [1.43, 1.43] },
+                dihedralInfo: "N/A (3 Atoms)"
+            },
+            'O3': { 
+                m: 2, n: 1, center: 'O', outer: 'O', name: '臭氧',
+                repulsion: 1.64, 
+                realAngleInfo: { val: "116.8°", source: "Experimental (Microwave Spectroscopy)" },
+                bondInfo: { text: "1.28 Å", source: "NIST", values: [1.28, 1.28] },
+                dihedralInfo: "N/A (3 Atoms)"
+            },
+            'SO3': { 
+                m: 3, n: 0, center: 'S', outer: 'O', name: '三氧化硫', 
+                realAngleInfo: { val: "120°", source: "Experimental" },
+                bondInfo: { text: "1.42 Å", source: "NIST", values: [1.42, 1.42, 1.42] },
+                dihedralInfo: "0° (Planar)"
+            },
+            'BF3': { 
+                m: 3, n: 0, center: 'B', outer: 'F', name: '三氟化硼', 
+                realAngleInfo: { val: "120°", source: "Experimental" },
+                bondInfo: { text: "1.31 Å", source: "NIST", values: [1.31, 1.31, 1.31] },
+                dihedralInfo: "0° (Planar)"
+            },
+            'BeCl2': { 
+                m: 2, n: 0, center: 'Be', outer: 'Cl', name: '氯化铍', 
+                realAngleInfo: { val: "180°", source: "Experimental" },
+                bondInfo: { text: "1.77 Å", source: "NIST", values: [1.77, 1.77] },
+                dihedralInfo: "N/A (Linear)"
+            },
+            'NF3': { 
+                m: 3, n: 1, center: 'N', outer: 'F', name: '三氟化氮', 
+                repulsion: 2.26, 
+                realAngleInfo: { val: "102.5°", source: "Experimental" },
+                bondInfo: { text: "1.37 Å", source: "NIST", values: [1.37, 1.37, 1.37] },
+                dihedralInfo: "N/A (Symmetric)"
+            }, 
+            'OF2': { 
+                m: 2, n: 2, center: 'O', outer: 'F', name: '二氟化氧', 
+                repulsion: 1.3, 
+                realAngleInfo: { val: "103.0°", source: "Experimental" },
+                bondInfo: { text: "1.41 Å", source: "NIST", values: [1.41, 1.41] },
+                dihedralInfo: "N/A (3 Atoms)"
+            }, 
+
+            // === 离子 ===
+            'NH4+': { 
+                m: 4, n: 0, center: 'N', outer: 'H', name: '铵根离子', 
+                realAngleInfo: { val: "109.5°", source: "Tetrahedral Symmetry" },
+                bondInfo: { text: "1.02 Å", source: "NIST", values: [1.02, 1.02, 1.02, 1.02] },
+                dihedralInfo: "N/A (Symmetric)"
+            },
+            'CO3_2-': { 
+                m: 3, n: 0, center: 'C', outer: 'O', name: '碳酸根离子', 
+                realAngleInfo: { val: "120°", source: "Resonance Symmetry" },
+                bondInfo: { text: "1.28 Å", source: "Experimental", values: [1.28, 1.28, 1.28] },
+                dihedralInfo: "0° (Planar)"
+            },
+            'SO4_2-': { 
+                m: 4, n: 0, center: 'S', outer: 'O', name: '硫酸根离子', 
+                realAngleInfo: { val: "109.5°", source: "Tetrahedral Symmetry" },
+                bondInfo: { text: "1.49 Å", source: "Experimental", values: [1.49, 1.49, 1.49, 1.49] },
+                dihedralInfo: "N/A (Symmetric)"
+            },
+            'SO3_2-': { 
+                m: 3, n: 1, center: 'S', outer: 'O', name: '亚硫酸根离子', 
+                repulsion: 1.65, 
+                realAngleInfo: { val: "106°", source: "Experimental" },
+                bondInfo: { text: "1.51 Å", source: "Experimental", values: [1.51, 1.51, 1.51] },
+                dihedralInfo: "N/A (Symmetric)"
+            }, 
+            'ClO4-': { 
+                m: 4, n: 0, center: 'Cl', outer: 'O', name: '高氯酸根离子', 
+                realAngleInfo: { val: "109.5°", source: "Tetrahedral Symmetry" },
+                bondInfo: { text: "1.44 Å", source: "Experimental", values: [1.44, 1.44, 1.44, 1.44] },
+                dihedralInfo: "N/A (Symmetric)"
+            },
+            'NO2-': { 
+                m: 2, n: 1, center: 'N', outer: 'O', name: '亚硝酸根离子',
+                repulsion: 1.92, 
+                realAngleInfo: { val: "115.4°", source: "Experimental (Diffraction/Spectroscopy)" },
+                bondInfo: { text: "1.24 Å", source: "Experimental", values: [1.24, 1.24] },
+                dihedralInfo: "N/A (3 Atoms)"
+            },
+            'NO3-': { 
+                m: 3, n: 0, center: 'N', outer: 'O', name: '硝酸根离子', 
+                realAngleInfo: { val: "120°", source: "Resonance Symmetry" },
+                bondInfo: { text: "1.24 Å", source: "Experimental", values: [1.24, 1.24, 1.24] },
+                dihedralInfo: "0° (Planar)"
+            },
+            'H3O+': { 
+                m: 3, n: 1, center: 'O', outer: 'H', name: '水合氢离子', 
+                repulsion: 0.23, 
+                realAngleInfo: { val: "113°", source: "Experimental" },
+                bondInfo: { text: "0.97 Å", source: "Experimental", values: [0.97, 0.97, 0.97] },
+                dihedralInfo: "N/A (Symmetric)"
+            } 
+        };
+
+        // 当前状态
+        let state = {
+            m: 2, // 成键对
+            n: 0, // 孤对
+            centerAtom: 'A',
+            outerAtom: 'X',
+            autoRotate: false,
+            repulsionStrength: 1.0, 
+            isHCHO: false, 
+            realAngleInfo: null,
+            bondInfo: null, // Store current bond info
+            dihedralInfo: null
+        };
+
+        // ==================== 2. 初始化场景 ====================
+        function init() {
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050510, 0.02);
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 2, 10);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // CSS2D 渲染器 (用于标签)
+            labelRenderer = new CSS2DRenderer();
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.domElement.style.position = 'absolute';
+            labelRenderer.domElement.style.top = '0px';
+            labelRenderer.domElement.style.pointerEvents = 'none';
+            document.getElementById('canvas-container').appendChild(labelRenderer.domElement);
+
+            // 灯光设置
+            const ambientLight = new THREE.AmbientLight(0x404040, 2); 
+            scene.add(ambientLight);
+
+            const mainLight = new THREE.DirectionalLight(0xffffff, 2);
+            mainLight.position.set(5, 10, 7);
+            mainLight.castShadow = true;
+            scene.add(mainLight);
+
+            const rimLight = new THREE.SpotLight(0x00f3ff, 5); 
+            rimLight.position.set(-5, 0, -5);
+            rimLight.lookAt(0, 0, 0);
+            scene.add(rimLight);
+
+            // 轨道控制器
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // 初始化交互工具
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // 创建背景和初始分子
+            createBackgroundParticles();
+            moleculeGroup = new THREE.Group();
+            labelsGroup = new THREE.Group();
+            scene.add(moleculeGroup);
+            scene.add(labelsGroup);
+            
+            // 绑定事件
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            setupUIControls();
+
+            // 启动循环
+            animate();
+            
+            // 初始加载
+            updateMoleculeFromPreset('CO2');
+        }
+
+        // ==================== 3. VSEPR 核心逻辑 ====================
+        
+        /**
+         * 根据电子域总数(m+n)计算位置向量，并考虑孤对电子斥力
+         */
+        function calculateVectors(m, n) {
+            const totalDomains = m + n;
+            let vectors = [];
+            const repulsion = state.repulsionStrength || 1.0;
+
+            if (state.isHCHO) {
+                // HCHO 特殊处理 (平面三角形变体)
+                // O 在 y 轴正向
+                // H-C-H = 116.5°, H-C-O = 121.8° (Sum = 360.1 due to rounding)
+                // 为了让显示值完美匹配，我们微调几何角度：
+                // 设 H-C-O = 121.75°，则 H-C-H = 360 - 243.5 = 116.5°
+                // 显示时 toFixed(1) 会将 121.75 显示为 121.8
+                
+                // O vector
+                vectors.push(new THREE.Vector3(0, 1, 0)); 
+                
+                // H vectors
+                const rad = THREE.MathUtils.degToRad(121.75);
+                vectors.push(new THREE.Vector3(Math.sin(rad), Math.cos(rad), 0));
+                vectors.push(new THREE.Vector3(-Math.sin(rad), Math.cos(rad), 0));
+                return vectors;
+            }
+
+            if (totalDomains === 2) {
+                // 直线形 (Linear)
+                vectors.push(new THREE.Vector3(1, 0, 0));
+                vectors.push(new THREE.Vector3(-1, 0, 0));
+            } else if (totalDomains === 3) {
+                // 平面三角形 (Trigonal Planar)
+                if (n === 1) {
+                    // V形 (n=1) - 孤对电子挤压键角
+                    // 动态计算：基于排斥系数调整
+                    // 模型考虑孤对电子-成键电子对之间的排斥作用与调整系数(5.0)的乘积关系
+                    // 预设的 repulsion 值已针对 SO2 (1.2), O3 (1.64), NO2- (1.92) 进行了校准，
+                    // 使得默认计算结果等于实验值。
+                    const idealAngle = 120;
+                    const compress = (repulsion - 1.0) * 5.0; 
+                    const bondAngle = idealAngle - compress;
+                    
+                    vectors.push(new THREE.Vector3(0, 1, 0)); // LP (Index 0)
+                    
+                    // 计算键角的一半，并从LP反方向(180度)开始偏转
+                    // 设 LP 在 0° (Y轴正向)
+                    // 两个成键原子应对称分布在 Y轴负向 两侧
+                    // 它们之间的夹角为 bondAngle
+                    // 所以每个原子与 Y轴负向 的夹角为 bondAngle / 2
+                    // 也就是与 Y轴正向 的夹角为 180 - (bondAngle / 2)
+                    
+                    const halfAngle = bondAngle / 2;
+                    const rad = THREE.MathUtils.degToRad(180 - halfAngle);
+                    
+                    vectors.push(new THREE.Vector3(Math.sin(rad), Math.cos(rad), 0));
+                    vectors.push(new THREE.Vector3(-Math.sin(rad), Math.cos(rad), 0));
+                } else {
+                    vectors.push(new THREE.Vector3(0, 1, 0));
+                    vectors.push(new THREE.Vector3(Math.sin(2*Math.PI/3), Math.cos(2*Math.PI/3), 0));
+                    vectors.push(new THREE.Vector3(Math.sin(4*Math.PI/3), Math.cos(4*Math.PI/3), 0));
+                }
+            } else if (totalDomains === 4) {
+                // 正四面体 (Tetrahedral)
+                const idealDeg = 109.47;
+                
+                if (n === 0) {
+                    // CH4
+                    vectors.push(new THREE.Vector3(1, 1, 1).normalize());
+                    vectors.push(new THREE.Vector3(1, -1, -1).normalize());
+                    vectors.push(new THREE.Vector3(-1, 1, -1).normalize());
+                    vectors.push(new THREE.Vector3(-1, -1, 1).normalize());
+                } else if (n === 1) {
+                    // NH3 (Triangular Pyramidal)
+                    // LP at (0, 1, 0)
+                    vectors.push(new THREE.Vector3(0, 1, 0)); // LP
+                    
+                    // Bonds pushed down
+                    const adjust = (repulsion - 1.0) * 5.0; 
+                    const alpha = idealDeg + adjust;
+                    const rad = THREE.MathUtils.degToRad(alpha);
+                    
+                    const y = Math.cos(rad);
+                    const r = Math.sin(rad);
+                    
+                    vectors.push(new THREE.Vector3(r*1, y, 0).normalize());
+                    vectors.push(new THREE.Vector3(r*Math.cos(2*Math.PI/3), y, r*Math.sin(2*Math.PI/3)).normalize());
+                    vectors.push(new THREE.Vector3(r*Math.cos(4*Math.PI/3), y, r*Math.sin(4*Math.PI/3)).normalize());
+                } else if (n === 2) {
+                    // H2O (Bent/V-shape)
+                    // BP Angle decreases with repulsion
+                    const currentAngleBP = idealDeg - (repulsion * 5.0); // e.g. 109.5 - 5 = 104.5
+                    const currentAngleLP = idealDeg + (repulsion * 5.0);
+                    
+                    const halfRadBP = THREE.MathUtils.degToRad(currentAngleBP / 2);
+                    const halfRadLP = THREE.MathUtils.degToRad(currentAngleLP / 2);
+                    
+                    // LPs in YZ plane (pointing UP-ish)
+                    const lps = [
+                        new THREE.Vector3(0, Math.cos(halfRadLP), Math.sin(halfRadLP)).normalize(),
+                        new THREE.Vector3(0, Math.cos(halfRadLP), -Math.sin(halfRadLP)).normalize()
+                    ];
+                    
+                    // BPs in XY plane (pointing DOWN-ish)
+                    const bps = [
+                        new THREE.Vector3(Math.sin(halfRadBP), -Math.cos(halfRadBP), 0).normalize(),
+                        new THREE.Vector3(-Math.sin(halfRadBP), -Math.cos(halfRadBP), 0).normalize()
+                    ];
+                    
+                    vectors = [...lps, ...bps];
+                    return vectors;
+                } else {
+                    // n=3? (Linear-ish HF?) or standard fallback
+                     vectors.push(new THREE.Vector3(1, 1, 1).normalize());
+                     vectors.push(new THREE.Vector3(1, -1, -1).normalize());
+                     vectors.push(new THREE.Vector3(-1, 1, -1).normalize());
+                     vectors.push(new THREE.Vector3(-1, -1, 1).normalize());
+                }
+            } else if (totalDomains === 5) {
+                 // TBP
+                vectors.push(new THREE.Vector3(1, 0, 0)); // Eq 1
+                vectors.push(new THREE.Vector3(Math.cos(2*Math.PI/3), 0, Math.sin(2*Math.PI/3))); // Eq 2
+                vectors.push(new THREE.Vector3(Math.cos(4*Math.PI/3), 0, Math.sin(4*Math.PI/3))); // Eq 3
+                vectors.push(new THREE.Vector3(0, 1, 0)); // Ax 1
+                vectors.push(new THREE.Vector3(0, -1, 0)); // Ax 2
+                
+                // Simple adjustment for Seesaw (n=1)
+                if (n === 1) {
+                    const bend = THREE.MathUtils.degToRad(2.0 * repulsion);
+                    vectors[3].applyAxisAngle(new THREE.Vector3(0,0,1), bend);
+                    vectors[4].applyAxisAngle(new THREE.Vector3(0,0,1), -bend);
+                }
+            } else if (totalDomains === 6) {
+                // Octahedral
+                vectors.push(new THREE.Vector3(1, 0, 0));
+                vectors.push(new THREE.Vector3(-1, 0, 0));
+                vectors.push(new THREE.Vector3(0, 1, 0));
+                vectors.push(new THREE.Vector3(0, -1, 0));
+                vectors.push(new THREE.Vector3(0, 0, 1));
+                vectors.push(new THREE.Vector3(0, 0, -1));
+            } else {
+                // Fallback
+                const goldenRatio = (1 + Math.sqrt(5)) / 2;
+                for (let i = 0; i < totalDomains; i++) {
+                    const theta = 2 * Math.PI * i / goldenRatio;
+                    const phi = Math.acos(1 - 2 * (i + 0.5) / totalDomains);
+                    vectors.push(new THREE.Vector3(Math.cos(theta) * Math.sin(phi), Math.sin(theta) * Math.sin(phi), Math.cos(phi)));
+                }
+            }
+            return vectors;
+        }
+
+        // 缓存对象以支持平滑过渡
+        let sceneObjects = {
+            center: null,
+            lps: [],
+            atoms: [],
+            bonds: []
+        };
+
+        /**
+         * 构建分子模型
+         */
+        function buildMolecule() {
+            const { m, n, centerAtom, outerAtom } = state;
+            const total = m + n;
+            const SCALE_FACTOR = 1.5; // 缩放因子: 1 Å ≈ 1.5 units
+            
+            // 1. 计算向量
+            let vectors = calculateVectors(m, n);
+            if (!vectors || vectors.length < total) {
+                vectors = [];
+                for(let k=0; k<total; k++) vectors.push(new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize());
+            }
+
+            const lpPositions = [];
+            const bpPositions = [];
+            const bpVectors = []; 
+            
+            for(let i=0; i<n; i++) {
+                lpPositions.push({ vec: vectors[i], pos: vectors[i].clone().multiplyScalar(1.3) });
+            }
+            
+            for(let i=n; i<total; i++) {
+                let len = 2.0; // 默认值 (自定义模式)
+                
+                // 如果有真实键长数据，使用真实数据
+                if (state.bondInfo && state.bondInfo.values) {
+                    const bondIdx = i - n;
+                    if (bondIdx < state.bondInfo.values.length) {
+                        len = state.bondInfo.values[bondIdx] * SCALE_FACTOR;
+                    }
+                }
+                
+                bpPositions.push({ vec: vectors[i], pos: vectors[i].clone().multiplyScalar(len) });
+                bpVectors.push(vectors[i]);
+            }
+
+            // 3. 比较当前场景与目标结构
+            const needsRebuild = (
+                !sceneObjects.center || 
+                sceneObjects.lps.length !== n || 
+                sceneObjects.atoms.length !== m ||
+                (sceneObjects.center.userData.atomType && state.centerAtom !== sceneObjects.center.userData.atomType)
+            );
+
+            if (needsRebuild) {
+                // === 全量重建 ===
+                while(moleculeGroup.children.length > 0) moleculeGroup.remove(moleculeGroup.children[0]);
+                sceneObjects = { center: null, lps: [], atoms: [], bonds: [] };
+                
+                // 中心原子
+                const centerColor = COLORS[centerAtom] || COLORS.Center;
+                const centerMesh = createSphere(0.8, centerColor, `中心原子: ${centerAtom}`);
+                centerMesh.userData.atomType = centerAtom;
+                moleculeGroup.add(centerMesh);
+                sceneObjects.center = centerMesh;
+                
+                centerMesh.scale.set(0,0,0);
+                new TWEEN.Tween(centerMesh.scale).to({x:1, y:1, z:1}, 500).easing(TWEEN.Easing.Elastic.Out).start();
+
+                // 孤对电子
+                lpPositions.forEach(d => {
+                    const mesh = createLonePairVisual(d.pos, d.vec);
+                    moleculeGroup.add(mesh);
+                    sceneObjects.lps.push(mesh);
+                    
+                    mesh.scale.set(0,0,0);
+                    new TWEEN.Tween(mesh.scale).to({x:1, y:1, z:1}, 500).delay(100).easing(TWEEN.Easing.Back.Out).start();
+                });
+
+                // 成键原子和键
+                bpPositions.forEach((d, i) => {
+                    let atomType = outerAtom;
+                    if (Array.isArray(outerAtom)) atomType = outerAtom[i % outerAtom.length];
+                    const atomColor = COLORS[atomType] || COLORS.H;
+                    
+                    const atomMesh = createSphere(0.6, atomColor, `配位原子: ${atomType}`);
+                    atomMesh.position.copy(d.pos);
+                    atomMesh.userData.atomType = atomType;
+                    moleculeGroup.add(atomMesh);
+                    sceneObjects.atoms.push(atomMesh);
+                    
+                    atomMesh.scale.set(0,0,0);
+                    new TWEEN.Tween(atomMesh.scale).to({x:1, y:1, z:1}, 500).delay(200).easing(TWEEN.Easing.Back.Out).start();
+
+                    const bondMesh = createBond(new THREE.Vector3(0,0,0), d.pos);
+                    moleculeGroup.add(bondMesh);
+                    sceneObjects.bonds.push(bondMesh);
+                    
+                    bondMesh.scale.set(0,0,0); 
+                    new TWEEN.Tween(bondMesh.scale).to({x:1, y:1, z:1}, 500).delay(200).start();
+                });
+                
+            } else {
+                // === 平滑更新 (Tween) ===
+                // 动画持续时间设置为 400ms (300-500ms range)
+                const animDuration = 400;
+
+                sceneObjects.lps.forEach((mesh, i) => {
+                    if (lpPositions[i]) {
+                        const targetPos = lpPositions[i].pos;
+                        const targetVec = lpPositions[i].vec;
+                        new TWEEN.Tween(mesh.position).to({x: targetPos.x, y: targetPos.y, z: targetPos.z}, animDuration).start();
+                        
+                        const axis = new THREE.Vector3(0, 1, 0);
+                        const targetQuat = new THREE.Quaternion().setFromUnitVectors(axis, targetVec);
+                        new TWEEN.Tween(mesh.quaternion).to({x: targetQuat.x, y: targetQuat.y, z: targetQuat.z, w: targetQuat.w}, animDuration).start();
+                    }
+                });
+
+                sceneObjects.atoms.forEach((mesh, i) => {
+                    if (bpPositions[i]) {
+                        const targetPos = bpPositions[i].pos;
+                        new TWEEN.Tween(mesh.position).to({x: targetPos.x, y: targetPos.y, z: targetPos.z}, animDuration).start();
+                    }
+                });
+
+                sceneObjects.bonds.forEach((mesh, i) => {
+                    if (bpPositions[i]) {
+                        const targetPos = bpPositions[i].pos;
+                        const mid = targetPos.clone().multiplyScalar(0.5);
+                        new TWEEN.Tween(mesh.position).to({x: mid.x, y: mid.y, z: mid.z}, animDuration).start();
+                        
+                        const direction = targetPos.clone().normalize();
+                        const axis = new THREE.Vector3(0, 1, 0);
+                        const targetQuat = new THREE.Quaternion().setFromUnitVectors(axis, direction);
+                        new TWEEN.Tween(mesh.quaternion).to({x: targetQuat.x, y: targetQuat.y, z: targetQuat.z, w: targetQuat.w}, animDuration).start();
+                    }
+                });
+            }
+
+            updateAngleLabels(bpVectors);
+            updateInfoPanel();
+        }
+
+        function updateAngleLabels(bpVectors) {
+            while(labelsGroup.children.length > 0) labelsGroup.remove(labelsGroup.children[0]);
+            
+            const checkbox = document.getElementById('show-angles');
+            if (checkbox && !checkbox.checked) return;
+            
+            if (bpVectors.length < 2) return;
+
+            const pairs = [];
+            
+            if (state.isHCHO) {
+                // HCHO 显示所有三个角度
+                // 0:O, 1:H, 2:H
+                pairs.push([0, 1]); // O-C-H
+                pairs.push([0, 2]); // O-C-H
+                pairs.push([1, 2]); // H-C-H
+            } else if (state.m >= 2) {
+                // 默认只显示前两个键的夹角
+                pairs.push([0, 1]);
+            }
+            
+            pairs.forEach(pair => {
+                const v1 = bpVectors[pair[0]];
+                const v2 = bpVectors[pair[1]];
+                if(!v1 || !v2) return;
+
+                const angleRad = v1.angleTo(v2);
+                const angleDeg = THREE.MathUtils.radToDeg(angleRad).toFixed(1);
+                const midDir = v1.clone().add(v2).normalize().multiplyScalar(1.5);
+                
+                const div = document.createElement('div');
+                div.className = 'label';
+                div.textContent = `${angleDeg}°`;
+                div.style.color = '#fff';
+                div.style.fontSize = '14px';
+                div.style.fontWeight = 'bold';
+                div.style.textShadow = '0 0 5px #000';
+                div.style.background = 'rgba(0,0,0,0.5)';
+                div.style.padding = '2px 6px';
+                div.style.borderRadius = '4px';
+                
+                const label = new CSS2DObject(div);
+                label.position.copy(midDir);
+                labelsGroup.add(label);
+            });
+        }
+
+        // ==================== 4. 几何体生成工具 ====================
+        
+        function createSphere(radius, color, name) {
+            const geometry = new THREE.SphereGeometry(radius, 32, 32);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color,
+                roughness: 0.3,
+                metalness: 0.2
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData = { name: name, isAtom: true };
+            return mesh;
+        }
+
+        function createBond(start, end) {
+            const direction = new THREE.Vector3().subVectors(end, start);
+            const length = direction.length();
+            
+            const geometry = new THREE.CylinderGeometry(0.15, 0.15, length, 16);
+            const material = new THREE.MeshStandardMaterial({ color: COLORS.Bond });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // 旋转圆柱体以匹配方向
+            const axis = new THREE.Vector3(0, 1, 0);
+            mesh.quaternion.setFromUnitVectors(axis, direction.clone().normalize());
+            
+            // 设置位置为中点
+            mesh.position.copy(start.clone().add(direction.multiplyScalar(0.5)));
+            mesh.userData = { name: "化学键", isBond: true };
+            
+            return mesh;
+        }
+
+        function createLonePairVisual(pos, dirNormal) {
+            // 孤对电子通常画成梨形或两个球，这里用半透明球体+发光模拟电子云
+            const geometry = new THREE.SphereGeometry(0.5, 24, 24);
+            // 拉伸一下使其像叶片
+            geometry.scale(1, 1.5, 1);
+            
+            const material = new THREE.MeshPhongMaterial({
+                color: COLORS.LonePair,
+                transparent: true,
+                opacity: 0.4,
+                shininess: 100,
+                depthWrite: false
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.copy(pos);
+            
+            // 旋转使其指向中心外
+            const axis = new THREE.Vector3(0, 1, 0);
+            mesh.quaternion.setFromUnitVectors(axis, dirNormal);
+            
+            mesh.userData = { name: "孤电子对 (Lone Pair)", isLP: true };
+            return mesh;
+        }
+
+        function createBackgroundParticles() {
+            const geometry = new THREE.BufferGeometry();
+            const count = 1000;
+            const positions = new Float32Array(count * 3);
+            
+            for(let i=0; i<count*3; i++) {
+                positions[i] = (Math.random() - 0.5) * 50;
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.1,
+                color: 0x00f3ff,
+                transparent: true,
+                opacity: 0.5
+            });
+            
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+
+        // ==================== 5. UI 交互与逻辑 ====================
+
+        function updateInfoPanel() {
+            const { m, n } = state;
+            const total = m + n;
+            
+            // AXE 表示法
+            let formula = `AX<sub>${m}</sub>`;
+            if (n > 0) formula += `E<sub>${n}</sub>`;
+            
+            document.getElementById('info-formula').innerHTML = formula;
+            document.getElementById('info-total').innerText = total;
+            document.getElementById('bp-val').innerText = m;
+            document.getElementById('lp-slider').value = n;
+            document.getElementById('lp-val').innerText = n;
+            document.getElementById('bp-slider').value = m;
+
+            // 构型判断逻辑
+            let eGeo = "未知";
+            let mGeo = "未知";
+            let angle = "未知";
+            let desc = "";
+
+            if (total === 2) {
+                eGeo = "直线形";
+                mGeo = (n===0) ? "直线形" : "直线形";
+                angle = "180°";
+                desc = "sp杂化。最简单的斥力最小构型。";
+            } else if (total === 3) {
+                eGeo = "平面三角形";
+                if (n===0) { mGeo = "平面三角形"; angle = "120°"; desc="sp²杂化。原子在同一平面。"; }
+                else if (n===1) { mGeo = "V形 (角形)"; angle = "<120°"; desc="孤对电子斥力大，压缩键角。"; }
+            } else if (total === 4) {
+                eGeo = "正四面体";
+                if (n===0) { mGeo = "正四面体"; angle = "109.5°"; desc="sp³杂化。经典有机化学构型。"; }
+                else if (n===1) { mGeo = "三角锥形"; angle = "107.3°"; desc="如氨气，孤对电子占据顶点。"; }
+                else if (n===2) { mGeo = "V形 (角形)"; angle = "104.5°"; desc="如水分子，两个孤对电子产生强斥力。"; }
+            } else if (total === 5) {
+                eGeo = "三角双锥";
+                if (n===0) { mGeo = "三角双锥"; angle = "90°, 120°"; desc="sp³d杂化。轴向和赤道向键长不同。"; }
+                else if (n===1) { mGeo = "变形四面体 (跷跷板)"; angle = "90°, 120°"; desc="孤对电子占据赤道面以最小化90°斥力。"; }
+                else if (n===2) { mGeo = "T形"; angle = "90°"; desc="两个孤对电子占据赤道面。"; }
+                else if (n===3) { mGeo = "直线形"; angle = "180°"; desc="三个孤对电子占据赤道面三角形。"; }
+            } else if (total === 6) {
+                eGeo = "正八面体";
+                if (n===0) { mGeo = "正八面体"; angle = "90°"; desc="sp³d²杂化。高度对称。"; }
+                else if (n===1) { mGeo = "四方锥形"; angle = "90°"; desc="一个孤对电子。"; }
+                else if (n===2) { mGeo = "平面四方形"; angle = "90°"; desc="孤对电子处于对位，抵消偶极矩。"; }
+            }
+
+            // ★ 覆盖真实数据逻辑 ★
+            if (state.realAngleInfo || state.bondInfo || state.dihedralInfo) {
+                // 如果有真实角度，覆盖默认显示
+                if (state.realAngleInfo) {
+                    angle = state.realAngleInfo.val;
+                }
+                
+                desc += `<br><br><strong style="color: var(--primary-color);">★ 真实几何数据 (Experimental Data):</strong><br>`;
+                
+                if (state.realAngleInfo) {
+                    desc += `<div style="margin-top:4px;">
+                                <span style="color: #fff;">键角 (Bond Angle):</span> 
+                                <span style="color: var(--secondary-color); font-weight:bold;">${state.realAngleInfo.val}</span>
+                                <br><span style="font-size: 0.85em; color: #888;">来源: ${state.realAngleInfo.source}</span>
+                             </div>`;
+                }
+
+                if (state.bondInfo) {
+                    desc += `<div style="margin-top:6px;">
+                                <span style="color: #fff;">键长 (Bond Length):</span> 
+                                <span style="color: var(--secondary-color); font-weight:bold;">${state.bondInfo.text}</span>
+                                <br><span style="font-size: 0.85em; color: #888;">来源: ${state.bondInfo.source}</span>
+                             </div>`;
+                }
+
+                if (state.dihedralInfo) {
+                    desc += `<div style="margin-top:6px;">
+                                <span style="color: #fff;">二面角 (Dihedral):</span> 
+                                <span style="color: var(--secondary-color); font-weight:bold;">${state.dihedralInfo}</span>
+                             </div>`;
+                } else {
+                    // Default for simple molecules if not specified but requested
+                     desc += `<div style="margin-top:6px;">
+                                <span style="color: #fff;">二面角 (Dihedral):</span> 
+                                <span style="color: #888;">N/A (Simple/Symmetric)</span>
+                             </div>`;
+                }
+            }
+
+            document.getElementById('info-electron-geo').innerText = eGeo;
+            document.getElementById('info-molecular-geo').innerText = mGeo;
+            document.getElementById('info-angle').innerText = angle;
+            document.getElementById('info-desc').innerHTML = desc; // 改为 innerHTML 支持换行和样式
+        }
+
+        function updateMoleculeFromPreset(presetKey) {
+            if (presetKey === 'custom') return;
+            
+            const p = PRESETS[presetKey];
+            state.m = p.m;
+            state.n = p.n;
+            state.centerAtom = p.center;
+            state.outerAtom = p.outer;
+            
+            // 更新扩展属性
+            state.repulsionStrength = p.repulsion !== undefined ? p.repulsion : 1.0;
+            state.isHCHO = !!p.isHCHO;
+            state.realAngleInfo = p.realAngleInfo || null;
+            state.bondInfo = p.bondInfo || null;
+            state.dihedralInfo = p.dihedralInfo || null;
+
+            // 同步 UI 控件
+            const repSlider = document.getElementById('rep-slider');
+            if(repSlider) {
+                repSlider.value = state.repulsionStrength;
+                document.getElementById('rep-val').innerText = state.repulsionStrength.toFixed(1);
+            }
+            
+            buildMolecule();
+        }
+
+        function setupUIControls() {
+            // 下拉菜单
+            const select = document.getElementById('molecule-select');
+            select.addEventListener('change', (e) => {
+                if (e.target.value === 'custom') {
+                    state.centerAtom = 'A';
+                    state.outerAtom = 'X';
+                } else {
+                    updateMoleculeFromPreset(e.target.value);
+                }
+            });
+
+            // 滑块
+            const bpSlider = document.getElementById('bp-slider');
+            const lpSlider = document.getElementById('lp-slider');
+            const repSlider = document.getElementById('rep-slider');
+
+            bpSlider.addEventListener('input', (e) => {
+                state.m = parseInt(e.target.value);
+                select.value = 'custom'; // 切换到自定义模式
+                state.centerAtom = 'A'; 
+                state.outerAtom = 'X';
+                // 重置特殊标记
+                state.isHCHO = false;
+                state.realAngleInfo = null;
+                state.bondInfo = null;
+                state.dihedralInfo = null;
+                buildMolecule();
+            });
+
+            lpSlider.addEventListener('input', (e) => {
+                state.n = parseInt(e.target.value);
+                select.value = 'custom';
+                state.centerAtom = 'A';
+                state.outerAtom = 'X';
+                state.isHCHO = false;
+                state.realAngleInfo = null;
+                state.bondInfo = null;
+                state.dihedralInfo = null;
+                buildMolecule();
+            });
+            
+            repSlider.addEventListener('input', (e) => {
+                state.repulsionStrength = parseFloat(e.target.value);
+                document.getElementById('rep-val').innerText = state.repulsionStrength.toFixed(1);
+                buildMolecule();
+            });
+            
+            // Checkbox
+            document.getElementById('show-angles').addEventListener('change', () => {
+                buildMolecule(); // Rebuild to update labels visibility
+            });
+
+            // 按钮
+            document.getElementById('reset-cam').addEventListener('click', () => {
+                controls.reset();
+            });
+
+            document.getElementById('toggle-auto-rotate').addEventListener('click', () => {
+                state.autoRotate = !state.autoRotate;
+                controls.autoRotate = state.autoRotate;
+            });
+        }
+
+        // ==================== 6. 动画与渲染循环 ====================
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) {
+            // 计算鼠标位置用于射线检测
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // Tooltip 逻辑
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(moleculeGroup.children);
+            
+            const tooltip = document.getElementById('tooltip');
+            
+            if (intersects.length > 0) {
+                const obj = intersects[0].object;
+                if (obj.userData.name) {
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = event.clientX + 15 + 'px';
+                    tooltip.style.top = event.clientY + 15 + 'px';
+                    tooltip.innerText = obj.userData.name;
+                    // 高亮效果(简单变色)
+                    document.body.style.cursor = 'pointer';
+                }
+            } else {
+                tooltip.style.display = 'none';
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            TWEEN.update(); // 更新动画
+            
+            // 粒子缓慢旋转
+            if(particleSystem) {
+                particleSystem.rotation.y += 0.0005;
+            }
+            
+            // 分子轻微浮动
+            if(moleculeGroup) {
+                moleculeGroup.position.y = Math.sin(Date.now() * 0.001) * 0.1;
+            }
+
+            // 更新 FPS (简单模拟)
+            
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera); // 渲染标签
+        }
+
+        // 启动
+        init();
+
+    </script>
+</body>
+</html>
